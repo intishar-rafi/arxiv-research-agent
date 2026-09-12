@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+langchain
+langchain-community
+langchain-openai
+langchain-core
+langgraph
+pinecone
+semantic-router
+google-search-results
+python-dotenv
+requests
