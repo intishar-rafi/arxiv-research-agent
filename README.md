@@ -1,7 +1,7 @@
 # ArXiv Research Agent
 
 An agentic research assistant powered by LangGraph, RAG (Pinecone), and live ArXiv/web search.
-You give it a research question, and it decides on its own whether to search a custom knowledge base, fetch a specific paper or search the live web then returns a synthesized, cited report.
+You give it a research question and it decides on its own whether to search a custom knowledge base, fetch a specific paper or search the live web then returns a synthesized, cited report.
 
 [![GIF](./demo.gif)](./demo.gif)
 
