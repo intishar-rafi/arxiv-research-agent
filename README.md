@@ -1,7 +1,7 @@
 # ArXiv Research Agent
 
 An agentic research assistant powered by LangGraph, RAG (Pinecone), and live ArXiv/web search.
-You give it a research question, and it decides — on its own — whether to search a custom knowledge base, fetch a specific paper, or search the live web, then returns a synthesized, cited report.
+You give it a research question, and it decides on its own whether to search a custom knowledge base, fetch a specific paper or search the live web then returns a synthesized, cited report.
 
 [![GIF](./demo.gif)](./demo.gif)
 
@@ -14,39 +14,55 @@ The project includes:
 
 ## Architecture
 
-```
-Question
-   │
-   ▼
-┌─────────┐     ┌───────────────┐
-│ Oracle   │────▶│ Tool Call      │
-│ (LLM)    │     │ • rag_search   │
-└─────────┘     │ • rag_search_  │
-   ▲             │   filter       │
-   │             │ • fetch_arxiv  │
-   │             │ • web_search   │
-   │             │ • image_search │
-   └─────────────┴───────────────┘
-            (loops until
-             final_answer,
-             capped at MAX_TURNS)
-                 │
-                 ▼
-          Structured Report
+```mermaid
+flowchart TD
+    Q["POST /ask<br/>{ question }"] --> ORACLE
+
+    subgraph LOOP["LangGraph loop — capped at MAX_TURNS"]
+        direction TB
+        ORACLE["Oracle (gpt-5-mini)<br/>reads question + scratchpad<br/>picks exactly one tool"] --> ROUTER{"tool chosen"}
+
+        ROUTER -->|rag_search| RAG["rag_search"]
+        ROUTER -->|rag_search_filter| RAGF["rag_search_filter"]
+        ROUTER -->|fetch_arxiv| ARXIV["fetch_arxiv"]
+        ROUTER -->|web_search| WEB["web_search"]
+        ROUTER -->|image_search| IMG["image_search"]
+        ROUTER -->|final_answer| DONE["final_answer"]
+
+        RAG --> STEP["append result to<br/>intermediate_steps"]
+        RAGF --> STEP
+        ARXIV --> STEP
+        WEB --> STEP
+        IMG --> STEP
+        STEP --> ORACLE
+    end
+
+    RAG -.-> PINECONE[("Pinecone index")]
+    RAGF -.-> PINECONE
+    ARXIV -.-> ARXIVAPI[("arxiv.org")]
+    WEB -.-> SERPAPI[("SerpAPI /<br/>Google Search")]
+    IMG -.-> SERPIMG[("SerpAPI /<br/>Google Images")]
+
+    DONE --> BUILD["build_report()"]
+    BUILD --> RESP["{ report }<br/>returned to caller"]
+
+    classDef plain fill:#fff,stroke:#000,color:#000;
+    class Q,ORACLE,ROUTER,RAG,RAGF,ARXIV,WEB,IMG,DONE,STEP,PINECONE,ARXIVAPI,SERPAPI,SERPIMG,BUILD,RESP plain;
+    style LOOP fill:#fff,stroke:#000,color:#000;
 ```
 
 A single LLM ("the oracle") repeatedly picks a tool, reads the result, and decides again — looping until it calls `final_answer` or hits `MAX_TURNS`. `build_report()` then formats that final answer into the returned report string.
 
 ### Tools
 
-| Tool | Purpose |
-|---|---|
-| `rag_search` | Semantic search over the full Pinecone knowledge base |
-| `rag_search_filter` | Semantic search restricted to one specific `arxiv_id` |
-| `fetch_arxiv` | Direct scrape of a paper's abstract from arxiv.org, given its ID |
-| `web_search` | Live Google search via SerpAPI, for anything outside the knowledge base |
-| `image_search` | Live Google Images search via SerpAPI, as a fallback for illustrative figures |
-| `final_answer` | Structured schema the oracle fills to produce the report and end the loop |
+| Tool                | Purpose                                                                       |
+| ------------------- | ----------------------------------------------------------------------------- |
+| `rag_search`        | Semantic search over the full Pinecone knowledge base                         |
+| `rag_search_filter` | Semantic search restricted to one specific `arxiv_id`                         |
+| `fetch_arxiv`       | Direct scrape of a paper's abstract from arxiv.org, given its ID              |
+| `web_search`        | Live Google search via SerpAPI, for anything outside the knowledge base       |
+| `image_search`      | Live Google Images search via SerpAPI, as a fallback for illustrative figures |
+| `final_answer`      | Structured schema the oracle fills to produce the report and end the loop     |
 
 ## Quick Start (Local)
 
